@@ -1,0 +1,32 @@
+[gd_scene format=3 uid="uid://gridknights_main"]
+
+[ext_resource type="Script" path="res://Scripts/GameManager.cs" id="1_gm"]
+[ext_resource type="Script" path="res://Scripts/GridMap.cs" id="2_grid"]
+[ext_resource type="Script" path="res://Scripts/HUD/GridHighlight.cs" id="3_hl"]
+[ext_resource type="Script" path="res://Scripts/HUD/HUD.cs" id="4_hud"]
+[ext_resource type="Script" path="res://Scripts/HUD/GameResultScreen.cs" id="5_grs"]
+[ext_resource type="Script" path="res://Scripts/HUD/UnitInfoPanel.cs" id="6_uip"]
+
+[node name="Main" type="Node2D"]
+
+[node name="GameManager" type="Node" parent="." node_paths=PackedStringArray("GridMap", "Hud", "Highlight", "ResultScreen")]
+script = ExtResource("1_gm")
+GridMap = NodePath("../GameBoard")
+Hud = NodePath("../HUD")
+Highlight = NodePath("../GameBoard/GridHighlight")
+ResultScreen = NodePath("../GameResultScreen")
+
+[node name="GameBoard" type="Node2D" parent="."]
+script = ExtResource("2_grid")
+
+[node name="UnitsLayer" type="Node2D" parent="GameBoard"]
+
+[node name="GridHighlight" type="Node2D" parent="GameBoard"]
+script = ExtResource("3_hl")
+
+[node name="GameResultScreen" type="CanvasLayer" parent="."]
+script = ExtResource("5_grs")
+
+[node name="HUD" type="CanvasLayer" parent="." node_paths=PackedStringArray("GameManager")]
+script = ExtResource("4_hud")
+GameManager = NodePath("../GameManager")

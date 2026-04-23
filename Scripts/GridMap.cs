@@ -3,7 +3,7 @@ using GridKnights.Units;
 
 namespace GridKnights;
 
-public partial class GridMap : Node2D
+public partial class GridMap : Node2D, IPassabilityMap
 {
     public const int GridSize = 8;
     public const int CellSize = 64;
@@ -20,7 +20,14 @@ public partial class GridMap : Node2D
 
     public override void _Ready()
     {
-        _unitsLayer = GetNode<Node2D>("UnitsLayer");
+        _unitsLayer = GetNodeOrNull<Node2D>("UnitsLayer") ?? CreateUnitsLayer();
+    }
+
+    private Node2D CreateUnitsLayer()
+    {
+        var layer = new Node2D { Name = "UnitsLayer" };
+        AddChild(layer);
+        return layer;
     }
 
     public override void _Draw()
@@ -63,6 +70,7 @@ public partial class GridMap : Node2D
 
     public void PlaceUnit(Unit unit, Vector2I cell)
     {
+        _unitsLayer ??= GetNodeOrNull<Node2D>("UnitsLayer") ?? CreateUnitsLayer();
         _units[cell.X, cell.Y] = unit;
         unit.GridPosition = cell;
         unit.Position = GridToWorld(cell);

@@ -1,31 +1,27 @@
 using System.Collections.Generic;
 using Godot;
-using GridKnights.Units;
 
 namespace GridKnights;
 
-/// <summary>
-/// マップ選別条件を担う独立クラス。
-/// 将来的にコアロジックシミュレーション選別に差し替えられるよう分離している。
-/// </summary>
 public static class MapValidator
 {
     private const int MinEnemyCount = 2;
     private const int MaxEnemyCount = 6;
     private const int MinAverageDistance = 3;
 
-    public static bool IsValid(GridMap grid, List<Unit> playerUnits, List<Unit> enemyUnits)
+    public static bool IsValid(MapGenerationData data)
     {
-        if (enemyUnits.Count < MinEnemyCount || enemyUnits.Count > MaxEnemyCount)
+        if (data.EnemyUnits.Count < MinEnemyCount || data.EnemyUnits.Count > MaxEnemyCount)
             return false;
 
-        // 自軍全員から敵への経路が少なくとも1本存在する
-        foreach (var player in playerUnits)
+        var grid = new ValidationGrid(data.Tiles, data.PlayerUnits, data.EnemyUnits);
+
+        foreach (var player in data.PlayerUnits)
         {
             bool hasAnyPath = false;
-            foreach (var enemy in enemyUnits)
+            foreach (var enemy in data.EnemyUnits)
             {
-                if (enemy.IsAlive && Pathfinder.HasPath(grid, player.GridPosition, enemy.GridPosition, Team.Player))
+                if (Pathfinder.HasPath(grid, player.Cell, enemy.Cell, Team.Player))
                 {
                     hasAnyPath = true;
                     break;
@@ -34,19 +30,38 @@ public static class MapValidator
             if (!hasAnyPath) return false;
         }
 
-        // 自軍と敵の平均マンハッタン距離 >= MinAverageDistance
         int totalDist = 0;
         int count = 0;
-        foreach (var player in playerUnits)
+        foreach (var player in data.PlayerUnits)
         {
-            foreach (var enemy in enemyUnits)
+            foreach (var enemy in data.EnemyUnits)
             {
-                totalDist += Mathf.Abs(player.GridPosition.X - enemy.GridPosition.X)
-                           + Mathf.Abs(player.GridPosition.Y - enemy.GridPosition.Y);
+                totalDist += Mathf.Abs(player.Cell.X - enemy.Cell.X)
+                           + Mathf.Abs(player.Cell.Y - enemy.Cell.Y);
                 count++;
             }
         }
         float avgDist = count > 0 ? (float)totalDist / count : 0f;
         return avgDist >= MinAverageDistance;
+    }
+
+    private sealed class ValidationGrid : IPassabilityMap
+    {
+        private readonly TileType[,] _tiles;
+        private readonly Dictionary<Vector2I, Team> _occupants;
+
+        public ValidationGrid(TileType[,] tiles, List<UnitInfo> players, List<UnitInfo> enemies)
+        {
+            _tiles = tiles;
+            _occupants = new Dictionary<Vector2I, Team>();
+            foreach (var u in players) _occupants[u.Cell] = u.Team;
+            foreach (var u in enemies) _occupants[u.Cell] = u.Team;
+        }
+
+        public bool IsPassable(Vector2I cell, Team movingTeam)
+        {
+            if (_tiles[cell.X, cell.Y] == TileType.Obstacle) return false;
+            return !_occupants.TryGetValue(cell, out var occupantTeam) || occupantTeam == movingTeam;
+        }
     }
 }

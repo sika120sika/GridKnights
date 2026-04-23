@@ -1,0 +1,16 @@
+# Godot エディタが生成するキャッシュ・ビルド成果物
+.godot/
+
+# .NET ビルド出力（スタンドアロン構成の場合）
+bin/
+obj/
+
+# IDE
+.vs/
+.idea/
+
+# LSP / エディタキャッシュ
+*.lscache
+
+# Claude Code プロジェクトデータ
+.claude/

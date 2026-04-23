@@ -17,15 +17,19 @@ public partial class GameResultScreen : CanvasLayer
 
     private void BuildUi()
     {
+        // 背景・パネルをまとめて管理するコンテナ
+        var container = new Control();
+        container.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        AddChild(container);
+        _overlay = container;
+
         // 半透明の背景
         var bg = new ColorRect
         {
             Color = new Color(0, 0, 0, 0.75f),
         };
         bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        AddChild(bg);
-
-        _overlay = bg;
+        container.AddChild(bg);
 
         // ダイアログパネル（中央 420×240）
         var panel = new PanelContainer
@@ -34,7 +38,7 @@ public partial class GameResultScreen : CanvasLayer
         };
         panel.SetAnchorsPreset(Control.LayoutPreset.Center);
         panel.Position = new Vector2(-210, -120);
-        AddChild(panel);
+        container.AddChild(panel);
 
         var margin = new MarginContainer();
         margin.AddThemeConstantOverride("margin_left", 24);

@@ -80,6 +80,11 @@ public partial class HUD : CanvasLayer
         _unitInfoPanel.ShowUnit(unit);
     }
 
+    public void UpdateEnemyInfo(Unit unit)
+    {
+        _unitInfoPanel.ShowUnit(unit, showState: false);
+    }
+
     public void ClearUnitInfo()
     {
         _unitInfoPanel.Clear();

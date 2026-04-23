@@ -42,19 +42,19 @@ public partial class UnitInfoPanel : Control
         vbox.AddChild(_stateLabel);
     }
 
-    public void ShowUnit(Unit unit)
+    public void ShowUnit(Unit unit, bool showState = true)
     {
         _nameLabel.Text  = Unit.GetDisplayName(unit.UnitType);
         _hpLabel.Text    = $"HP: {unit.Hp} / {unit.MaxHp}";
         _statsLabel.Text = $"攻撃:{unit.Attack}  移動:{unit.MoveRange}  射程:{unit.AttackRange}";
-        _stateLabel.Text = unit.ActionState switch
+        _stateLabel.Text = showState ? unit.ActionState switch
         {
             UnitActionState.Idle     => "行動可能",
             UnitActionState.Moved    => "移動済（攻撃可）",
             UnitActionState.Attacked => "攻撃済",
             UnitActionState.Done     => "行動完了",
             _                        => "",
-        };
+        } : "";
         Visible = true;
     }
 

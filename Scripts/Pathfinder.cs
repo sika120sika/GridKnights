@@ -28,15 +28,14 @@ public static class Pathfinder
                 var next = current + dir;
                 if (!GridMap.IsInBounds(next)) continue;
                 if (visited.ContainsKey(next)) continue;
-                // 障害物はスキップ、敵チームのユニットがいるセルは通過不可
+                // 障害物・敵ユニットのいるセルは通過不可
                 if (!grid.IsPassable(next, movingTeam)) continue;
-                // 敵ユニットが占有するセルは移動先にできない
-                var occupant = grid.GetUnit(next);
-                if (occupant != null && occupant.Team != movingTeam) continue;
 
                 visited[next] = cost + 1;
-                result.Add(next);
                 queue.Enqueue(next);
+                // 友軍ユニットのいるセルは通過できるが停止できない
+                if (grid.GetUnit(next) == null)
+                    result.Add(next);
             }
         }
 
@@ -63,7 +62,7 @@ public static class Pathfinder
     }
 
     /// <summary>startからendへの経路が存在するか（BFS）。MapValidator用。</summary>
-    public static bool HasPath(GridMap grid, Vector2I start, Vector2I end, Team movingTeam)
+    public static bool HasPath(IPassabilityMap grid, Vector2I start, Vector2I end, Team movingTeam)
     {
         if (start == end) return true;
         var visited = new HashSet<Vector2I> { start };
@@ -88,7 +87,7 @@ public static class Pathfinder
     }
 
     /// <summary>BFSで最短経路を返す（移動AIに使用）。経路なしの場合は空リスト。</summary>
-    public static List<Vector2I> FindPath(GridMap grid, Vector2I start, Vector2I end, Team movingTeam)
+    public static List<Vector2I> FindPath(IPassabilityMap grid, Vector2I start, Vector2I end, Team movingTeam)
     {
         if (start == end) return new List<Vector2I>();
         var prev = new Dictionary<Vector2I, Vector2I> { [start] = start };

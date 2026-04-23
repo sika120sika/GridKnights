@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -45,6 +44,11 @@ public partial class GameManager : Node
         GridMap.CellClicked += OnCellClicked;
         BuildMap();
         EmitSignal(SignalName.TurnChanged, (int)_phase);
+        CallDeferred(MethodName.InitHud);
+    }
+
+    private void InitHud()
+    {
         Hud.UpdateTurnLabel(_phase);
         Hud.SetEndTurnButtonVisible(true);
     }
@@ -53,39 +57,40 @@ public partial class GameManager : Node
 
     private void BuildMap()
     {
-        var result = MapGenerator.Generate(CreateUnit);
+        var data = MapGenerator.Generate();
 
-        // GameManager管理下にGridMapを追加する
-        // (Main.tscnでGridMapはGameManagerの兄弟なのでAddChildは不要だが、生成されたユニットをGridMapへ登録)
-        _playerUnits = result.PlayerUnits.OfType<PlayerUnit>().ToList();
-        _enemyUnits = result.EnemyUnits.OfType<EnemyUnit>().ToList();
+        for (int x = 0; x < GridMap.GridSize; x++)
+            for (int y = 0; y < GridMap.GridSize; y++)
+                GridMap.SetTile(new Vector2I(x, y), data.Tiles[x, y]);
 
-        foreach (var unit in _playerUnits)
+        foreach (var info in data.PlayerUnits)
         {
+            var unit = (PlayerUnit)CreateUnit(info.Type, info.Team);
+            GridMap.PlaceUnit(unit, info.Cell);
             unit.Defeated += OnUnitDefeated;
+            _playerUnits.Add(unit);
         }
-        foreach (var unit in _enemyUnits)
+
+        foreach (var info in data.EnemyUnits)
         {
+            var unit = (EnemyUnit)CreateUnit(info.Type, info.Team);
+            GridMap.PlaceUnit(unit, info.Cell);
             unit.Defeated += OnUnitDefeated;
+            _enemyUnits.Add(unit);
         }
     }
 
     private Unit CreateUnit(UnitType type, Team team)
     {
-        Unit unit;
-        if (team == Team.Player)
-        {
-            var pu = new PlayerUnit();
-            unit = pu;
-        }
-        else
-        {
-            var eu = new EnemyUnit();
-            unit = eu;
-        }
+        Unit unit = team == Team.Player ? new PlayerUnit() : new EnemyUnit();
         unit.Team = team;
         unit.UnitType = type;
         unit.Name = Unit.GetDisplayName(type);
+        var stats = Unit.GetStats(type);
+        unit.MaxHp = stats.MaxHp;
+        unit.Attack = stats.Attack;
+        unit.MoveRange = stats.MoveRange;
+        unit.AttackRange = stats.AttackRange;
         return unit;
     }
 
@@ -111,7 +116,16 @@ public partial class GameManager : Node
 
     private void HandleSelectUnit(Vector2I cell)
     {
-        var unit = GridMap.GetUnit(cell) as PlayerUnit;
+        var clicked = GridMap.GetUnit(cell);
+
+        // 敵ユニットをクリックした場合は情報表示のみ
+        if (clicked is EnemyUnit enemy && enemy.IsAlive)
+        {
+            Hud.UpdateEnemyInfo(enemy);
+            return;
+        }
+
+        var unit = clicked as PlayerUnit;
         if (unit == null || !unit.IsAlive || unit.ActionState == UnitActionState.Done) return;
 
         _selectedUnit = unit;
@@ -147,6 +161,7 @@ public partial class GameManager : Node
             {
                 target.TakeDamage(_selectedUnit.Attack);
                 _selectedUnit.ActionState = UnitActionState.Done;
+                _selectedUnit.RefreshDisplay();
                 FinishUnitAction();
                 return;
             }
@@ -251,19 +266,21 @@ public partial class GameManager : Node
     private void OnUnitDefeated(Unit unit)
     {
         GridMap.RemoveUnit(unit);
+        if (unit is PlayerUnit pu) _playerUnits.Remove(pu);
+        else if (unit is EnemyUnit eu) _enemyUnits.Remove(eu);
         CheckWinLoss();
     }
 
     private void CheckWinLoss()
     {
         if (_gameEnded) return;
-        if (_enemyUnits.All(e => !e.IsAlive))
+        if (_enemyUnits.Count == 0)
         {
             _gameEnded = true;
             EmitSignal(SignalName.GameCleared);
             ResultScreen.ShowClear();
         }
-        else if (_playerUnits.All(p => !p.IsAlive))
+        else if (_playerUnits.Count == 0)
         {
             _gameEnded = true;
             EmitSignal(SignalName.GameFailed);

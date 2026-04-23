@@ -30,22 +30,12 @@ public class RuleBasedEnemyBrain : IEnemyBrain
                 var reachable = Pathfinder.GetReachableCells(grid, self.GridPosition, self.MoveRange, self.Team);
                 var path = Pathfinder.FindPath(grid, self.GridPosition, nearestPlayer.GridPosition, self.Team);
 
+                // 経路上で到達可能な最も遠いセルに移動する
                 Vector2I? bestCell = null;
-                int bestDist = int.MaxValue;
-
-                foreach (var cell in reachable)
+                foreach (var cell in path)
                 {
-                    // 移動先に敵チームのユニットがいなければOK（友軍はOK）
-                    var occupant = grid.GetUnit(cell);
-                    if (occupant != null && occupant.Team != self.Team) continue;
-
-                    int dist = Mathf.Abs(cell.X - nearestPlayer.GridPosition.X)
-                             + Mathf.Abs(cell.Y - nearestPlayer.GridPosition.Y);
-                    if (dist < bestDist)
-                    {
-                        bestDist = dist;
+                    if (reachable.Contains(cell))
                         bestCell = cell;
-                    }
                 }
 
                 if (bestCell.HasValue && bestCell.Value != self.GridPosition)

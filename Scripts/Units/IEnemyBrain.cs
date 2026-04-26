@@ -1,6 +1,8 @@
+using System.Threading.Tasks;
+
 namespace GridKnights.Units;
 
 public interface IEnemyBrain
 {
-    void TakeTurn(EnemyUnit self, GridMap grid);
+    Task TakeTurnAsync(EnemyUnit self, GridMap grid);
 }

@@ -32,6 +32,8 @@ public partial class GameManager : Node
 
     private bool _gameEnded;
 
+    private bool _isAnimating; // アニメーション中は入力を無視
+
     private enum PlayerInputState
     {
         SelectUnit,
@@ -98,7 +100,7 @@ public partial class GameManager : Node
 
     private void OnCellClicked(Vector2I cell)
     {
-        if (_gameEnded || _phase != TurnPhase.PlayerTurn) return;
+        if (_gameEnded || _isAnimating || _phase != TurnPhase.PlayerTurn) return;
 
         switch (_inputState)
         {
@@ -149,11 +151,12 @@ public partial class GameManager : Node
         }
     }
 
-    private void HandleSelectMove(Vector2I cell)
+    // メソッドシグネチャ変更
+    private async void HandleSelectMove(Vector2I cell)
     {
         if (_selectedUnit == null) return;
 
-        // 攻撃対象セルをクリック
+        // 攻撃対象セルをクリック（変更なし）
         if (_attackTargets.Contains(cell))
         {
             var target = GridMap.GetUnit(cell);
@@ -167,23 +170,25 @@ public partial class GameManager : Node
             }
         }
 
-        // 移動先をクリック
+        // ★ 移動先をクリック：アニメーション追加
         if (_reachableCells.Contains(cell))
         {
-            GridMap.MoveUnit(_selectedUnit, cell);
+            _isAnimating = true;
+            Highlight.ClearAll(); // 移動中はハイライトを消す
+
+            await GridMap.MoveUnitAsync(_selectedUnit, cell);
+
+            _isAnimating = false;
             _selectedUnit.ActionState = UnitActionState.Moved;
             _selectedUnit.RefreshDisplay();
 
-            // 移動後に攻撃範囲を更新
             _attackTargets = Pathfinder.GetAttackTargets(GridMap, cell, _selectedUnit.AttackRange, Team.Player);
-            Highlight.ClearAll();
             Highlight.ShowAttackRange(_attackTargets);
             Hud.UpdateUnitInfo(_selectedUnit);
             _inputState = PlayerInputState.SelectAttack;
             return;
         }
 
-        // 別ユニット選択
         CancelSelection();
         HandleSelectUnit(cell);
     }
@@ -227,6 +232,7 @@ public partial class GameManager : Node
 
     // --- ターン終了 ---
 
+    // EndPlayerTurn 内の呼び出しも変更が必要なので注意
     public void EndPlayerTurn()
     {
         if (_gameEnded || _phase != TurnPhase.PlayerTurn) return;
@@ -235,21 +241,23 @@ public partial class GameManager : Node
         Hud.UpdateTurnLabel(_phase);
         Hud.SetEndTurnButtonVisible(false);
         EmitSignal(SignalName.TurnChanged, (int)_phase);
-        ExecuteEnemyTurn();
+        ExecuteEnemyTurnAsync(); // ★ async版を呼ぶ（awaitしない）
     }
 
-    private void ExecuteEnemyTurn()
+    private async void ExecuteEnemyTurnAsync()
     {
-        foreach (var enemy in _enemyUnits)
+        _isAnimating = true;
+
+        foreach (var enemy in _enemyUnits.ToList()) // ToList()でイテレート中の削除に備える
         {
             if (!enemy.IsAlive) continue;
-            enemy.ExecuteTurn(GridMap);
+            await enemy.ExecuteTurnAsync(GridMap); // ★ EnemyUnit側も変更が必要
         }
 
+        _isAnimating = false;
         CheckWinLoss();
         if (_gameEnded) return;
 
-        // プレイヤーターンに戻す
         foreach (var u in _playerUnits) u.ResetAction();
         foreach (var u in _playerUnits) u.RefreshDisplay();
         foreach (var u in _enemyUnits) u.ResetAction();

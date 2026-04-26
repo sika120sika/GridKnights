@@ -1,11 +1,13 @@
 using System.Collections.Generic;
 using Godot;
 
+using System.Threading.Tasks;
+
 namespace GridKnights.Units;
 
 public class RuleBasedEnemyBrain : IEnemyBrain
 {
-    public void TakeTurn(EnemyUnit self, GridMap grid)
+    public async Task TakeTurnAsync(EnemyUnit self, GridMap grid)
     {
         // 攻撃可能な敵がいれば攻撃
         if (self.CanAttack)
@@ -40,7 +42,7 @@ public class RuleBasedEnemyBrain : IEnemyBrain
 
                 if (bestCell.HasValue && bestCell.Value != self.GridPosition)
                 {
-                    grid.MoveUnit(self, bestCell.Value);
+                    await grid.MoveUnitAsync(self, bestCell.Value);
                     self.ActionState = UnitActionState.Moved;
                 }
             }

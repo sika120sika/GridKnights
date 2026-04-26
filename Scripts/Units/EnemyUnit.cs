@@ -1,5 +1,7 @@
 using Godot;
 
+using System.Threading.Tasks;
+
 namespace GridKnights.Units;
 
 public partial class EnemyUnit : Unit
@@ -30,9 +32,9 @@ public partial class EnemyUnit : Unit
         DrawString(ThemeDB.FallbackFont, new Vector2(-8, 7), label, HorizontalAlignment.Left, -1, 14, Colors.White);
     }
 
-    public void ExecuteTurn(GridMap grid)
+    public async Task ExecuteTurnAsync(GridMap grid)
     {
-        Brain.TakeTurn(this, grid);
+        await Brain.TakeTurnAsync(this, grid);
         QueueRedraw();
     }
 

@@ -1,7 +1,8 @@
 using Godot;
 
-namespace GridKnights.Units;
+using System.Threading.Tasks;
 
+namespace GridKnights.Units;
 public abstract partial class Unit : Node2D
 {
     [Export] public UnitType UnitType { get; set; }
@@ -41,6 +42,23 @@ public abstract partial class Unit : Node2D
         ActionState = UnitActionState.Idle;
     }
 
+    private const float MoveSpeedPxPerSec = 300f; // 1秒に300px移動
+
+    /// <summary>
+    /// 指定ワールド座標へTweenでスライド移動し、完了を待機する。
+    /// </summary>
+    public async Task MoveToAsync(Vector2 targetWorld)
+    {
+        float distance = Position.DistanceTo(targetWorld);
+        float duration = distance / MoveSpeedPxPerSec;
+
+        var tween = CreateTween();
+        tween.TweenProperty(this, "position", targetWorld, duration)
+            .SetTrans(Tween.TransitionType.Sine)
+            .SetEase(Tween.EaseType.InOut);
+
+        await ToSignal(tween, Tween.SignalName.Finished);
+    }
     public static UnitStats GetStats(UnitType type)
     {
         return type switch

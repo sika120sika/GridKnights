@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Godot;
-
 using System.Threading.Tasks;
+using GridKnights.HUD;
 
 namespace GridKnights.Units;
 
@@ -15,9 +15,10 @@ public class RuleBasedEnemyBrain : IEnemyBrain
             var targets = Pathfinder.GetAttackTargets(grid, self.GridPosition, self.AttackRange, self.Team);
             if (targets.Count > 0)
             {
-                var target = PickNearest(self.GridPosition, targets);
-                var targetUnit = grid.GetUnit(target);
-                targetUnit?.TakeDamage(self.Attack);
+                var targetCell = PickNearest(self.GridPosition, targets);
+                var targetUnit = grid.GetUnit(targetCell);
+                if (targetUnit != null)
+                    await PerformAttackAsync(self, targetUnit);
                 self.ActionState = UnitActionState.Done;
                 return;
             }
@@ -54,9 +55,10 @@ public class RuleBasedEnemyBrain : IEnemyBrain
             var targets = Pathfinder.GetAttackTargets(grid, self.GridPosition, self.AttackRange, self.Team);
             if (targets.Count > 0)
             {
-                var target = PickNearest(self.GridPosition, targets);
-                var targetUnit = grid.GetUnit(target);
-                targetUnit?.TakeDamage(self.Attack);
+                var targetCell = PickNearest(self.GridPosition, targets);
+                var targetUnit = grid.GetUnit(targetCell);
+                if (targetUnit != null)
+                    await PerformAttackAsync(self, targetUnit);
             }
         }
 
@@ -78,6 +80,17 @@ public class RuleBasedEnemyBrain : IEnemyBrain
             }
         }
         return nearest;
+    }
+
+    private static async Task PerformAttackAsync(Unit attacker, Unit target)
+    {
+        var origin = attacker.Position;
+        var targetWorldPos = GridMap.GridToWorld(target.GridPosition);
+        await attacker.LungeForwardAsync(targetWorldPos);
+        target.TakeDamage(attacker.Attack);
+        DamagePopup.Spawn(attacker.GetParent(), targetWorldPos, attacker.Attack);
+        if (target.IsAlive) await target.ShakeAsync();
+        await attacker.LungeReturnAsync(origin);
     }
 
     private static Vector2I PickNearest(Vector2I origin, List<Vector2I> targets)

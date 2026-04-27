@@ -80,13 +80,11 @@ public partial class GridMap : Node2D, IPassabilityMap
             _unitsLayer.AddChild(unit);
     }
 
-    // MoveUnit をデータ更新専用にする（Position設定を削除）
-    public void MoveUnit(Unit unit, Vector2I to)
+    private void MoveUnit(Unit unit, Vector2I to)
     {
         _units[unit.GridPosition.X, unit.GridPosition.Y] = null;
         _units[to.X, to.Y] = unit;
         unit.GridPosition = to;
-        // ★ unit.Position = GridToWorld(to); を削除
     }
 
     // ★ 追加：アニメーション付き移動

@@ -30,6 +30,7 @@ public partial class EnemyUnit : Unit
             _                       => "?",
         };
         DrawString(ThemeDB.FallbackFont, new Vector2(-8, 7), label, HorizontalAlignment.Left, -1, 14, Colors.White);
+        DrawHpBar();
     }
 
     public async Task ExecuteTurnAsync(GridMap grid)
@@ -38,8 +39,4 @@ public partial class EnemyUnit : Unit
         QueueRedraw();
     }
 
-    public void RefreshDisplay()
-    {
-        QueueRedraw();
-    }
 }

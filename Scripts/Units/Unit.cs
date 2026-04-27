@@ -33,6 +33,7 @@ public abstract partial class Unit : Node2D
         if (!IsAlive) return;
         Hp = Mathf.Max(0, Hp - damage);
         EmitSignal(SignalName.HpChanged, Hp, MaxHp);
+        QueueRedraw();
         if (Hp <= 0)
             EmitSignal(SignalName.Defeated, this);
     }
@@ -40,6 +41,11 @@ public abstract partial class Unit : Node2D
     public void ResetAction()
     {
         ActionState = UnitActionState.Idle;
+    }
+
+    public void RefreshDisplay()
+    {
+        QueueRedraw();
     }
 
     private const float MoveSpeedPxPerSec = 300f; // 1秒に300px移動
@@ -59,6 +65,58 @@ public abstract partial class Unit : Node2D
 
         await ToSignal(tween, Tween.SignalName.Finished);
     }
+
+    protected void DrawHpBar()
+    {
+        const float barW = 44f;
+        const float barH = 5f;
+        float barX = -barW / 2f;
+        const float barY = 26f;
+
+        DrawRect(new Rect2(barX, barY, barW, barH), new Color(0.15f, 0.15f, 0.15f));
+
+        float ratio = MaxHp > 0 ? (float)Hp / MaxHp : 0f;
+        if (ratio > 0f)
+        {
+            var fillColor = ratio > 0.6f
+                ? new Color(0.2f, 0.8f, 0.2f)
+                : ratio > 0.3f
+                    ? new Color(0.9f, 0.8f, 0.1f)
+                    : new Color(0.9f, 0.2f, 0.2f);
+            DrawRect(new Rect2(barX, barY, barW * ratio, barH), fillColor);
+        }
+    }
+
+    private const float LungeRatio = 0.35f;
+    private const float LungeMaxPx = 28f;
+
+    public async Task LungeForwardAsync(Vector2 targetWorld)
+    {
+        var dir = (targetWorld - Position).Normalized();
+        float dist = Mathf.Min(Position.DistanceTo(targetWorld) * LungeRatio, LungeMaxPx);
+        var tween = CreateTween();
+        tween.TweenProperty(this, "position", Position + dir * dist, 0.10f)
+             .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
+        await ToSignal(tween, Tween.SignalName.Finished);
+    }
+
+    public async Task LungeReturnAsync(Vector2 origin)
+    {
+        var tween = CreateTween();
+        tween.TweenProperty(this, "position", origin, 0.12f)
+             .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+        await ToSignal(tween, Tween.SignalName.Finished);
+    }
+
+    public async Task ShakeAsync()
+    {
+        float ox = Position.X;
+        var tween = CreateTween();
+        foreach (var off in new float[] { -7f, 6f, -5f, 4f, -2f, 1f, 0f })
+            tween.TweenProperty(this, "position:x", ox + off, 0.04f);
+        await ToSignal(tween, Tween.SignalName.Finished);
+    }
+
     public static UnitStats GetStats(UnitType type)
     {
         return type switch

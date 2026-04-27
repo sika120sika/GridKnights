@@ -1,6 +1,6 @@
 # GridKnights — コードベース概要
 
-> 最終更新: 2026-04-26
+> 最終更新: 2026-04-27
 
 ---
 
@@ -44,10 +44,10 @@ Main (Node2D)
 
 | クラス | ファイル | 責務 |
 |--------|---------|------|
-| `Unit` | `Scripts/Units/Unit.cs` | パラメータ管理・HP 管理・`HpChanged`/`Defeated` シグナル。`static GetStats(UnitType)` でスタティックパラメータ取得。 |
-| `PlayerUnit` | `Scripts/Units/PlayerUnit.cs` | プレイヤーユニット。`_Draw()` で青円と種別記号を描画。行動完了時にグレイアウト。 |
-| `EnemyUnit` | `Scripts/Units/EnemyUnit.cs` | 敵ユニット。`ExecuteTurn()` で `IEnemyBrain` に行動委譲。赤四角を描画。 |
-| `RuleBasedEnemyBrain` | `Scripts/Units/RuleBasedEnemyBrain.cs` | 最近傍プレイヤーへ移動→攻撃のルールベース AI。`IEnemyBrain` 実装。 |
+| `Unit` | `Scripts/Units/Unit.cs` | パラメータ管理・HP 管理・`HpChanged`/`Defeated` シグナル。`static GetStats(UnitType)` でスタティックパラメータ取得。`MoveToAsync` / `LungeForwardAsync` / `LungeReturnAsync` / `ShakeAsync` でアニメーション処理。`DrawHpBar()` でHPバー描画。 |
+| `PlayerUnit` | `Scripts/Units/PlayerUnit.cs` | プレイヤーユニット。`_Draw()` で青円と種別記号・HPバーを描画。行動完了時にグレイアウト。 |
+| `EnemyUnit` | `Scripts/Units/EnemyUnit.cs` | 敵ユニット。`ExecuteTurnAsync()` で `IEnemyBrain` に行動委譲（非同期）。赤四角・HPバーを描画。 |
+| `RuleBasedEnemyBrain` | `Scripts/Units/RuleBasedEnemyBrain.cs` | 最近傍プレイヤーへ移動→攻撃のルールベース AI。`IEnemyBrain` 実装。`TakeTurnAsync` で非同期処理。攻撃時にランジ＋シェイクアニメーションとダメージポップアップを実行。 |
 
 ### HUD / UI
 
@@ -57,6 +57,7 @@ Main (Node2D)
 | `GridHighlight` | `Scripts/HUD/GridHighlight.cs` | 移動範囲（青）・攻撃範囲（赤）のセルハイライト描画。 |
 | `UnitInfoPanel` | `Scripts/HUD/UnitInfoPanel.cs` | 選択ユニットの HP・攻撃力・移動・射程・行動状態を表示。 |
 | `GameResultScreen` | `Scripts/HUD/GameResultScreen.cs` | 勝利/敗北テキスト表示・リスタートボタン制御。`ProcessMode = Always` で停止中も動作。 |
+| `DamagePopup` | `Scripts/HUD/DamagePopup.cs` | 攻撃時のダメージ数値をユニット上に一時表示するポップアップ。`Spawn()` で生成。 |
 
 ### Enum（`Scripts/Enums/`）
 
@@ -97,15 +98,18 @@ Main (Node2D)
 
 ### プレイヤー操作
 1. **選択** — ユニットをクリック → 移動範囲（青）・攻撃範囲（赤）をハイライト表示
-2. **移動** — 移動範囲内のセルをクリックして移動（BFS で到達可否を判定）
-3. **攻撃** — 攻撃範囲内の敵をクリックしてダメージを与える
+2. **移動** — 移動範囲内のセルをクリックして移動（BFS で到達可否を判定・Tween スライドアニメーション）
+3. **攻撃** — 攻撃範囲内の敵をクリックしてダメージを与える（ランジ前進 → ダメージ → 被弾シェイク → 後退のアニメーション）
 - 移動後に攻撃が可能（`Moved` 状態）
 - 攻撃後は行動完了（`Done` 状態）、グレイアウト表示
+- アニメーション実行中（`_isAnimating` フラグ）は入力を無視
 
 ### 敵AI（RuleBasedEnemyBrain）
 1. 攻撃範囲内にプレイヤーユニットがいれば即攻撃
 2. いなければ最近傍プレイヤーユニットへ向かって移動
 3. 移動後に再度攻撃判定を実施
+- 各敵の行動は非同期（`TakeTurnAsync`）で、行動間に 0.3 秒のウェイトを挟む
+- 攻撃時はプレイヤー攻撃と同様のランジ＋シェイクアニメーション＋ダメージポップアップ
 
 ### マップ生成
 - グリッドサイズ: 8×8、セルサイズ: 64px
@@ -124,6 +128,8 @@ Main (Node2D)
 - 選択ユニットの HP・パラメータ情報パネル
 - 移動範囲・攻撃範囲ハイライト
 - 勝利/敗北結果画面 + リスタート
+- 攻撃時ダメージポップアップ（`DamagePopup`）
+- ユニット上部の HP バー（緑→黄→赤でグラデーション変化）
 
 ---
 
@@ -136,9 +142,7 @@ Main (Node2D)
 | 項目 | 内容 |
 |-----|------|
 | マップ生成の強制フォールバック | `MapGenerator` は 10 回失敗すると検証をスキップして強制生成する。稀に不正なマップが生成される可能性がある。 |
-| 敵ターンは即時同期処理 | `ExecuteEnemyTurn()` は全敵の行動を同期的に一括処理する。アニメーション演出を挿入する際は非同期処理への変更が必要。 |
-| 攻撃エフェクト未実装 | 攻撃時の視覚フィードバック（アニメーション・SE）がない。 |
-| ユニット移動アニメーション未実装 | 移動は即時テレポート。 |
+| BGM / SE 未実装 | 攻撃・移動・勝敗の効果音・BGM がない。 |
 
 ### 拡張余地
 
@@ -148,4 +152,4 @@ Main (Node2D)
 | スキル・特殊行動 | `UnitActionState.Attacked` が未使用のため、攻撃後移動など追加行動フローの拡張余地あり |
 | 複数シーン・ステージ | 現状は Main.tscn 1 シーンのみ。ステージ選択・マップデータ外部化は未実装 |
 | セーブ/ロード | 未実装 |
-| BGM / SE | 未実装 |
+| BGM / SE | 攻撃・移動・勝敗の効果音・BGM が未実装 |

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Godot;
 using GridKnights.HUD;
 using GridKnights.Units;
@@ -151,26 +152,22 @@ public partial class GameManager : Node
         }
     }
 
-    // メソッドシグネチャ変更
     private async void HandleSelectMove(Vector2I cell)
     {
         if (_selectedUnit == null) return;
 
-        // 攻撃対象セルをクリック（変更なし）
+        // 攻撃対象セルをクリック
         if (_attackTargets.Contains(cell))
         {
             var target = GridMap.GetUnit(cell);
             if (target != null && target.Team == Team.Enemy && target.IsAlive)
             {
-                target.TakeDamage(_selectedUnit.Attack);
-                _selectedUnit.ActionState = UnitActionState.Done;
-                _selectedUnit.RefreshDisplay();
-                FinishUnitAction();
+                await PerformAttackAnimationAsync(_selectedUnit, target);
                 return;
             }
         }
 
-        // ★ 移動先をクリック：アニメーション追加
+        // 移動先をクリック
         if (_reachableCells.Contains(cell))
         {
             _isAnimating = true;
@@ -193,7 +190,7 @@ public partial class GameManager : Node
         HandleSelectUnit(cell);
     }
 
-    private void HandleSelectAttack(Vector2I cell)
+    private async void HandleSelectAttack(Vector2I cell)
     {
         if (_selectedUnit == null) return;
 
@@ -202,16 +199,32 @@ public partial class GameManager : Node
             var target = GridMap.GetUnit(cell);
             if (target != null && target.Team == Team.Enemy && target.IsAlive)
             {
-                target.TakeDamage(_selectedUnit.Attack);
-                _selectedUnit.ActionState = UnitActionState.Done;
-                _selectedUnit.RefreshDisplay();
-                FinishUnitAction();
+                await PerformAttackAnimationAsync(_selectedUnit, target);
                 return;
             }
         }
 
         // 攻撃キャンセルして選択に戻る
         CancelSelection();
+    }
+
+    private async Task PerformAttackAnimationAsync(PlayerUnit attacker, Unit target)
+    {
+        _isAnimating = true;
+        Highlight.ClearAll();
+        var origin = attacker.Position;
+        var targetWorldPos = GridMap.GridToWorld(target.GridPosition);
+
+        await attacker.LungeForwardAsync(targetWorldPos);
+        target.TakeDamage(attacker.Attack);
+        DamagePopup.Spawn(attacker.GetParent(), targetWorldPos, attacker.Attack);
+        if (target.IsAlive) await target.ShakeAsync();
+        await attacker.LungeReturnAsync(origin);
+
+        _isAnimating = false;
+        attacker.ActionState = UnitActionState.Done;
+        attacker.RefreshDisplay();
+        FinishUnitAction();
     }
 
     private void CancelSelection()
@@ -232,26 +245,28 @@ public partial class GameManager : Node
 
     // --- ターン終了 ---
 
-    // EndPlayerTurn 内の呼び出しも変更が必要なので注意
     public void EndPlayerTurn()
     {
-        if (_gameEnded || _phase != TurnPhase.PlayerTurn) return;
+        if (_gameEnded || _isAnimating || _phase != TurnPhase.PlayerTurn) return;
         CancelSelection();
         _phase = TurnPhase.EnemyTurn;
         Hud.UpdateTurnLabel(_phase);
         Hud.SetEndTurnButtonVisible(false);
         EmitSignal(SignalName.TurnChanged, (int)_phase);
-        ExecuteEnemyTurnAsync(); // ★ async版を呼ぶ（awaitしない）
+        ExecuteEnemyTurnAsync();
     }
 
     private async void ExecuteEnemyTurnAsync()
     {
         _isAnimating = true;
 
-        foreach (var enemy in _enemyUnits.ToList()) // ToList()でイテレート中の削除に備える
+        foreach (var enemy in _enemyUnits.ToList())
         {
+            if (_gameEnded) break;
             if (!enemy.IsAlive) continue;
-            await enemy.ExecuteTurnAsync(GridMap); // ★ EnemyUnit側も変更が必要
+            await enemy.ExecuteTurnAsync(GridMap);
+            if (!_gameEnded)
+                await ToSignal(GetTree().CreateTimer(0.3f), SceneTreeTimer.SignalName.Timeout);
         }
 
         _isAnimating = false;

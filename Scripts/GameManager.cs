@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
+using GridKnights.Commands;
 using GridKnights.HUD;
 using GridKnights.Units;
 
@@ -156,28 +157,22 @@ public partial class GameManager : Node
     {
         if (_selectedUnit == null) return;
 
-        // 攻撃対象セルをクリック
         if (_attackTargets.Contains(cell))
         {
             var target = GridMap.GetUnit(cell);
             if (target != null && target.Team == Team.Enemy && target.IsAlive)
             {
-                await PerformAttackAnimationAsync(_selectedUnit, target);
+                Highlight.ClearAll();
+                await ExecuteCommandAsync(new AttackCommand(_selectedUnit, target));
+                FinishUnitAction();
                 return;
             }
         }
 
-        // 移動先をクリック
         if (_reachableCells.Contains(cell))
         {
-            _isAnimating = true;
-            Highlight.ClearAll(); // 移動中はハイライトを消す
-
-            await GridMap.MoveUnitAsync(_selectedUnit, cell);
-
-            _isAnimating = false;
-            _selectedUnit.ActionState = UnitActionState.Moved;
-            _selectedUnit.RefreshDisplay();
+            Highlight.ClearAll();
+            await ExecuteCommandAsync(new MoveCommand(_selectedUnit, cell, GridMap));
 
             _attackTargets = Pathfinder.GetAttackTargets(GridMap, cell, _selectedUnit.AttackRange, Team.Player);
             Highlight.ShowAttackRange(_attackTargets);
@@ -199,32 +194,27 @@ public partial class GameManager : Node
             var target = GridMap.GetUnit(cell);
             if (target != null && target.Team == Team.Enemy && target.IsAlive)
             {
-                await PerformAttackAnimationAsync(_selectedUnit, target);
+                Highlight.ClearAll();
+                await ExecuteCommandAsync(new AttackCommand(_selectedUnit, target));
+                FinishUnitAction();
                 return;
             }
         }
 
-        // 攻撃キャンセルして選択に戻る
         CancelSelection();
     }
 
-    private async Task PerformAttackAnimationAsync(PlayerUnit attacker, Unit target)
+    private async Task ExecuteCommandAsync(IUnitCommand command)
     {
         _isAnimating = true;
-        Highlight.ClearAll();
-        var origin = attacker.Position;
-        var targetWorldPos = GridMap.GridToWorld(target.GridPosition);
-
-        await attacker.LungeForwardAsync(targetWorldPos);
-        target.TakeDamage(attacker.Attack);
-        DamagePopup.Spawn(attacker.GetParent(), targetWorldPos, attacker.Attack);
-        if (target.IsAlive) await target.ShakeAsync();
-        await attacker.LungeReturnAsync(origin);
-
-        _isAnimating = false;
-        attacker.ActionState = UnitActionState.Done;
-        attacker.RefreshDisplay();
-        FinishUnitAction();
+        try
+        {
+            await command.ExecuteAsync();
+        }
+        finally
+        {
+            _isAnimating = false;
+        }
     }
 
     private void CancelSelection()

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using System.Threading.Tasks;
-using GridKnights.HUD;
+using GridKnights.Commands;
 
 namespace GridKnights.Units;
 
@@ -9,22 +9,21 @@ public class RuleBasedEnemyBrain : IEnemyBrain
 {
     public async Task TakeTurnAsync(EnemyUnit self, GridMap grid)
     {
-        // 攻撃可能な敵がいれば攻撃
+        // 攻撃範囲内にプレイヤーがいれば即攻撃して終了
         if (self.CanAttack)
         {
             var targets = Pathfinder.GetAttackTargets(grid, self.GridPosition, self.AttackRange, self.Team);
             if (targets.Count > 0)
             {
-                var targetCell = PickNearest(self.GridPosition, targets);
-                var targetUnit = grid.GetUnit(targetCell);
+                var targetUnit = grid.GetUnit(PickNearest(self.GridPosition, targets));
                 if (targetUnit != null)
-                    await PerformAttackAsync(self, targetUnit);
+                    await new AttackCommand(self, targetUnit).ExecuteAsync();
                 self.ActionState = UnitActionState.Done;
                 return;
             }
         }
 
-        // 移動: 最近傍の敵プレイヤーユニットに向かって進む
+        // 最近傍プレイヤーへ向かって移動
         if (self.CanMove)
         {
             var nearestPlayer = FindNearestPlayer(self, grid);
@@ -33,19 +32,12 @@ public class RuleBasedEnemyBrain : IEnemyBrain
                 var reachable = Pathfinder.GetReachableCells(grid, self.GridPosition, self.MoveRange, self.Team);
                 var path = Pathfinder.FindPath(grid, self.GridPosition, nearestPlayer.GridPosition, self.Team);
 
-                // 経路上で到達可能な最も遠いセルに移動する
                 Vector2I? bestCell = null;
                 foreach (var cell in path)
-                {
-                    if (reachable.Contains(cell))
-                        bestCell = cell;
-                }
+                    if (reachable.Contains(cell)) bestCell = cell;
 
                 if (bestCell.HasValue && bestCell.Value != self.GridPosition)
-                {
-                    await grid.MoveUnitAsync(self, bestCell.Value);
-                    self.ActionState = UnitActionState.Moved;
-                }
+                    await new MoveCommand(self, bestCell.Value, grid).ExecuteAsync();
             }
         }
 
@@ -55,10 +47,9 @@ public class RuleBasedEnemyBrain : IEnemyBrain
             var targets = Pathfinder.GetAttackTargets(grid, self.GridPosition, self.AttackRange, self.Team);
             if (targets.Count > 0)
             {
-                var targetCell = PickNearest(self.GridPosition, targets);
-                var targetUnit = grid.GetUnit(targetCell);
+                var targetUnit = grid.GetUnit(PickNearest(self.GridPosition, targets));
                 if (targetUnit != null)
-                    await PerformAttackAsync(self, targetUnit);
+                    await new AttackCommand(self, targetUnit).ExecuteAsync();
             }
         }
 
@@ -80,17 +71,6 @@ public class RuleBasedEnemyBrain : IEnemyBrain
             }
         }
         return nearest;
-    }
-
-    private static async Task PerformAttackAsync(Unit attacker, Unit target)
-    {
-        var origin = attacker.Position;
-        var targetWorldPos = GridMap.GridToWorld(target.GridPosition);
-        await attacker.LungeForwardAsync(targetWorldPos);
-        target.TakeDamage(attacker.Attack);
-        DamagePopup.Spawn(attacker.GetParent(), targetWorldPos, attacker.Attack);
-        if (target.IsAlive) await target.ShakeAsync();
-        await attacker.LungeReturnAsync(origin);
     }
 
     private static Vector2I PickNearest(Vector2I origin, List<Vector2I> targets)

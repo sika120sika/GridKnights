@@ -14,6 +14,7 @@ public abstract partial class Unit : Node2D
 
     public int Hp { get; private set; }
     public bool IsAlive => Hp > 0;
+    public bool IsDefending { get; set; }
     public UnitActionState ActionState { get; set; } = UnitActionState.Idle;
     public Vector2I GridPosition { get; set; }
 
@@ -28,14 +29,17 @@ public abstract partial class Unit : Node2D
         Hp = MaxHp;
     }
 
-    public void TakeDamage(int damage)
+    // 実際に受けたダメージ量を返す（防御中は50%カット）
+    public int TakeDamage(int damage)
     {
-        if (!IsAlive) return;
-        Hp = Mathf.Max(0, Hp - damage);
+        if (!IsAlive) return 0;
+        int actualDamage = IsDefending ? damage / 2 : damage;
+        Hp = Mathf.Max(0, Hp - actualDamage);
         EmitSignal(SignalName.HpChanged, Hp, MaxHp);
         QueueRedraw();
         if (Hp <= 0)
             EmitSignal(SignalName.Defeated, this);
+        return actualDamage;
     }
 
     public void ResetAction()
@@ -85,6 +89,40 @@ public abstract partial class Unit : Node2D
                     : new Color(0.9f, 0.2f, 0.2f);
             DrawRect(new Rect2(barX, barY, barW * ratio, barH), fillColor);
         }
+    }
+
+    // 防御中の盾アイコンをユニット右上に描画する
+    protected void DrawDefendOverlay()
+    {
+        const float cx = 13f;
+        const float cy = -19f;
+        const float hw = 6f;   // 半幅
+        const float ht = 7f;   // 上部高さ
+        const float hb = 8f;   // 下部（三角）高さ
+
+        var fill    = new Color(0.25f, 0.55f, 1.0f, 0.92f);
+        var outline = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+        var divide  = new Color(1.0f, 1.0f, 1.0f, 0.7f);
+
+        var verts = new Vector2[]
+        {
+            new(cx - hw, cy - ht),   // 左上
+            new(cx + hw, cy - ht),   // 右上
+            new(cx + hw, cy),        // 右中
+            new(cx,      cy + hb),   // 下先端
+            new(cx - hw, cy),        // 左中
+        };
+
+        var colors = new Color[] { fill, fill, fill, fill, fill };
+        DrawPolygon(verts, colors);
+
+        // アウトライン
+        DrawPolyline(new[] { verts[0], verts[1], verts[2], verts[3], verts[4], verts[0] }, outline, 1.5f);
+
+        // 縦の中央線（盾紋様）
+        DrawLine(new Vector2(cx, cy - ht), new Vector2(cx, cy + hb), divide, 1f);
+        // 横の仕切り線
+        DrawLine(new Vector2(cx - hw, cy), new Vector2(cx + hw, cy), divide, 1f);
     }
 
     private const float LungeRatio = 0.35f;

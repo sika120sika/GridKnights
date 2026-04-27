@@ -142,6 +142,7 @@ public partial class GameManager : Node
             Highlight.ShowMovementRange(_reachableCells);
             Highlight.ShowAttackRange(_attackTargets);
             _inputState = PlayerInputState.SelectMove;
+            Hud.SetDefendButtonVisible(true);
         }
         else if (unit.CanAttack)
         {
@@ -150,6 +151,7 @@ public partial class GameManager : Node
             Highlight.ClearAll();
             Highlight.ShowAttackRange(_attackTargets);
             _inputState = PlayerInputState.SelectAttack;
+            Hud.SetDefendButtonVisible(true);
         }
     }
 
@@ -217,6 +219,16 @@ public partial class GameManager : Node
         }
     }
 
+    public async void DefendSelectedUnit()
+    {
+        if (_gameEnded || _isAnimating || _phase != TurnPhase.PlayerTurn) return;
+        if (_selectedUnit == null || _inputState == PlayerInputState.SelectUnit) return;
+
+        Highlight.ClearAll();
+        await ExecuteCommandAsync(new DefendCommand(_selectedUnit));
+        FinishUnitAction();
+    }
+
     private void CancelSelection()
     {
         _selectedUnit = null;
@@ -225,6 +237,7 @@ public partial class GameManager : Node
         Highlight.ClearAll();
         _inputState = PlayerInputState.SelectUnit;
         Hud.ClearUnitInfo();
+        Hud.SetDefendButtonVisible(false);
     }
 
     private void FinishUnitAction()
@@ -263,7 +276,7 @@ public partial class GameManager : Node
         CheckWinLoss();
         if (_gameEnded) return;
 
-        foreach (var u in _playerUnits) u.ResetAction();
+        foreach (var u in _playerUnits) { u.IsDefending = false; u.ResetAction(); }
         foreach (var u in _playerUnits) u.RefreshDisplay();
         foreach (var u in _enemyUnits) u.ResetAction();
         foreach (var u in _enemyUnits) u.RefreshDisplay();

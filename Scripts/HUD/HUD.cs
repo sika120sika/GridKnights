@@ -9,6 +9,7 @@ public partial class HUD : CanvasLayer
 
     private Label _turnLabel = null!;
     private Button _endTurnButton = null!;
+    private Button _defendButton = null!;
     private UnitInfoPanel _unitInfoPanel = null!;
     private Label _helpLabel = null!;
 
@@ -37,6 +38,17 @@ public partial class HUD : CanvasLayer
         };
         AddChild(_unitInfoPanel);
 
+        // 防御ボタン（ターン終了ボタンの左隣）
+        _defendButton = new Button
+        {
+            Text = "防御",
+            CustomMinimumSize = new Vector2(100, 40),
+            Position = new Vector2(1024 - 140 - 116, 768 - 56),
+            Visible = false,
+        };
+        _defendButton.Pressed += OnDefendPressed;
+        AddChild(_defendButton);
+
         // ターン終了ボタン（右下）
         _endTurnButton = new Button
         {
@@ -63,6 +75,11 @@ public partial class HUD : CanvasLayer
         GameManager?.EndPlayerTurn();
     }
 
+    private void OnDefendPressed()
+    {
+        GameManager?.DefendSelectedUnit();
+    }
+
     public void UpdateTurnLabel(TurnPhase phase)
     {
         _turnLabel.Text = phase == TurnPhase.PlayerTurn ? "【プレイヤーターン】" : "【敵ターン】";
@@ -73,6 +90,11 @@ public partial class HUD : CanvasLayer
     public void SetEndTurnButtonVisible(bool visible)
     {
         _endTurnButton.Visible = visible;
+    }
+
+    public void SetDefendButtonVisible(bool visible)
+    {
+        _defendButton.Visible = visible;
     }
 
     public void UpdateUnitInfo(Unit unit)

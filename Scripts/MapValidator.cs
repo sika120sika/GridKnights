@@ -30,6 +30,21 @@ public static class MapValidator
             if (!hasAnyPath) return false;
         }
 
+        // 敵ユニット全員がプレイヤーへの経路を持つことを確認
+        foreach (var enemy in data.EnemyUnits)
+        {
+            bool hasAnyPath = false;
+            foreach (var player in data.PlayerUnits)
+            {
+                if (Pathfinder.HasPath(grid, enemy.Cell, player.Cell, Team.Enemy))
+                {
+                    hasAnyPath = true;
+                    break;
+                }
+            }
+            if (!hasAnyPath) return false;
+        }
+
         int totalDist = 0;
         int count = 0;
         foreach (var player in data.PlayerUnits)

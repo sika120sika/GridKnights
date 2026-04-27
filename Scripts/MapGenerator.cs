@@ -113,6 +113,7 @@ public static class MapGenerator
     }
 
     // 障害物のみで判定（ユニット位置は除外）。ユニットは動くので配置時点の位置で経路を塞がない
+    // プレイヤー全員が敵に到達でき、かつ敵全員がプレイヤーに到達できることを確認する
     private static bool AllPathsExist(TilePassabilityMap map, List<UnitInfo> players, List<UnitInfo> enemies)
     {
         foreach (var player in players)
@@ -128,6 +129,22 @@ public static class MapGenerator
             }
             if (!hasPath) return false;
         }
+
+        // 敵ユニットも全員プレイヤーへの経路を持つことを確認（孤立した敵の生成を防ぐ）
+        foreach (var enemy in enemies)
+        {
+            bool hasPath = false;
+            foreach (var player in players)
+            {
+                if (Pathfinder.HasPath(map, enemy.Cell, player.Cell, Team.Enemy))
+                {
+                    hasPath = true;
+                    break;
+                }
+            }
+            if (!hasPath) return false;
+        }
+
         return true;
     }
 

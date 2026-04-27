@@ -21,8 +21,8 @@ public class AttackCommand : IUnitCommand
         var targetPos = GridMap.GridToWorld(_target.GridPosition);
 
         await _attacker.LungeForwardAsync(targetPos);
-        _target.TakeDamage(_attacker.Attack);
-        DamagePopup.Spawn(_attacker.GetParent(), targetPos, _attacker.Attack);
+        int actualDamage = _target.TakeDamage(_attacker.Attack);
+        DamagePopup.Spawn(_attacker.GetParent(), targetPos, actualDamage);
         if (_target.IsAlive) await _target.ShakeAsync();
         await _attacker.LungeReturnAsync(origin);
 

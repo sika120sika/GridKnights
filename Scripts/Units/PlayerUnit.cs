@@ -26,6 +26,8 @@ public partial class PlayerUnit : Unit
         };
         DrawString(ThemeDB.FallbackFont, new Vector2(-8, 7), label, HorizontalAlignment.Left, -1, 14, Colors.White);
         DrawHpBar();
+        if (IsDefending)
+            DrawDefendOverlay();
     }
 
 }
